@@ -1,0 +1,45 @@
+name = "DB Example Mod"
+prefix = "db_example"
+mainprefix = "z"
+author = "DarkBall, Sam, and contributors"
+
+[files]
+include = [
+    "meta.cpp",
+    "mod.cpp",
+]
+
+exclude = [
+    "**/.DS_Store",
+    "**/Thumbs.db",
+    "**/*.bak",
+    "**/*.bak.*",
+    "**/*.back.*",
+    "**/*.tmp",
+    "**/*.orig",
+    "**/*.rej",
+    "**/* - Copy.*",
+    "**/*.psd",
+    "**/*.psb",
+    "**/*.xcf",
+    "**/*.blend",
+    "**/*.blend1",
+    "**/.gitkeep",
+    "addons/**/README*",
+    "optionals/**/README*",
+]
+
+[version]
+major = 1
+minor = 0
+patch = 0
+git_hash = 0
+
+[hemtt.build]
+pdrive = "disallow"
+
+[hemtt.release]
+folder = "DB_Example_Mod"
+
+[signing]
+authority = "db_example"

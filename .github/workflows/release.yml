@@ -1,0 +1,205 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to validate without publishing
+        required: true
+        default: v1.0.0
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    name: Release contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Verify tag points to main
+        if: github.event_name == 'push'
+        shell: bash
+        run: test "$GITHUB_SHA" = "$(git rev-parse origin/main)"
+
+      - name: Verify release canary uses main
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: test "$GITHUB_REF" = "refs/heads/main"
+
+      - name: Verify version and Workshop ID
+        run: python3 -B tools/release_contract.py "${{ github.event_name == 'push' && github.ref_name || inputs.version }}"
+
+  build:
+    name: Windows release
+    needs: contract
+    runs-on: windows-latest
+    environment: release-production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Require production key
+        shell: pwsh
+        env:
+          BI_PRIVATE_KEYS_JSON: ${{ secrets.BI_PRIVATE_KEYS_JSON }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:BI_PRIVATE_KEYS_JSON)) {
+              throw "BI_PRIVATE_KEYS_JSON is required for production releases"
+          }
+
+      - name: Set up HEMTT
+        uses: arma-actions/hemtt@a0570ddd80d2b7be9c0f052494c0f700b42668dd # v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          version: "v1.21.0"
+
+      - name: Set up Arma 3 Tools
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.BUILD_ASSETS_TOKEN }}
+        run: ./tools/setup_arma3_tools.ps1
+
+      - name: Build binarized release
+        run: hemtt release --no-sign
+
+      - name: Sign release with stable BI key
+        shell: pwsh
+        env:
+          BI_PRIVATE_KEYS_JSON: ${{ secrets.BI_PRIVATE_KEYS_JSON }}
+        run: ./tools/sign_release.ps1
+
+      - name: Repack signed release
+        run: python -B tools/package_release.py
+
+      - name: Verify PBO signatures
+        shell: pwsh
+        run: |
+          $pbos = Get-ChildItem .hemttout\release -Recurse -Filter *.pbo
+          if ($pbos.Count -eq 0) { throw "No release PBOs found" }
+          foreach ($pbo in $pbos) {
+              $signatures = @(Get-ChildItem "$($pbo.FullName).*bisign" -ErrorAction SilentlyContinue)
+              if ($signatures.Count -ne 1) { throw "Expected exactly one signature for $($pbo.Name)" }
+              $suffix = $signatures[0].Name.Substring($pbo.Name.Length + 1)
+              $authority = $suffix.Substring(0, $suffix.Length - ".bisign".Length)
+              if ($authority -notmatch '^[A-Za-z0-9._-]+$') { throw "Invalid signing authority" }
+              $modRoot = Split-Path $pbo.Directory.FullName -Parent
+              $key = Join-Path $modRoot "keys\$authority.bikey"
+              if (-not (Test-Path $key)) { throw "Missing public key for $($pbo.Name)" }
+              hemtt utils verify $pbo.FullName $key
+              if ($LASTEXITCODE -ne 0) { throw "Signature verification failed for $($pbo.Name)" }
+          }
+
+      - name: Prepare checksums
+        id: release
+        shell: pwsh
+        run: |
+          $archive = Get-ChildItem releases\*.zip | Where-Object Name -NotMatch "latest" | Select-Object -First 1
+          if ($null -eq $archive) { throw "Versioned release archive not found" }
+          $hash = (Get-FileHash -Algorithm SHA256 $archive.FullName).Hash.ToLowerInvariant()
+          "$hash  $($archive.Name)" | Set-Content -Encoding utf8NoBOM SHA256SUMS
+
+      - name: Upload release payload
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: release-${{ github.ref_name }}
+          path: |
+            releases/*.zip
+            SHA256SUMS
+          if-no-files-found: error
+
+  github:
+    name: GitHub Release
+    needs: build
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download release payload
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          name: release-${{ github.ref_name }}
+          path: release-payload
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" release-payload/* --repo "${{ github.repository }}" --verify-tag --generate-notes
+
+  steam:
+    name: Steam Workshop
+    needs: github
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    environment: steam-production
+    permissions:
+      contents: read
+    env:
+      STEAM_USERNAME: ${{ secrets.STEAM_USERNAME }}
+      STEAM_CONFIG_VDF: ${{ secrets.STEAM_CONFIG_VDF }}
+    steps:
+      - name: Checkout metadata
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Download release payload
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          name: release-${{ github.ref_name }}
+          path: release-payload
+
+      - name: Require Steam credentials
+        shell: bash
+        run: |
+          test -n "$STEAM_USERNAME"
+          test -n "$STEAM_CONFIG_VDF"
+
+      - name: Install SteamCMD
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/steamcmd"
+          curl -fsSL https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz | tar -xz -C "$RUNNER_TEMP/steamcmd"
+          "$RUNNER_TEMP/steamcmd/steamcmd.sh" +quit
+
+      - name: Restore Steam login token
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/steamcmd/config"
+          printf '%s' "$STEAM_CONFIG_VDF" > "$RUNNER_TEMP/steamcmd/config/config.vdf"
+
+      - name: Prepare Workshop content
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          archive=$(find release-payload -name '*.zip' ! -name '*latest*' -print -quit)
+          test -n "$archive"
+          mkdir workshop-content
+          unzip -q "$archive" -d workshop-content
+          content=$(find workshop-content -mindepth 1 -maxdepth 1 -type d -print -quit)
+          test -n "$content"
+          gh release view "${{ github.ref_name }}" --repo "${{ github.repository }}" --json body --jq .body > "$RUNNER_TEMP/changenote.txt"
+          python3 -B tools/write_workshop_vdf.py --content "$content" --output "$RUNNER_TEMP/workshop.vdf" --change-note-file "$RUNNER_TEMP/changenote.txt"
+
+      - name: Upload to Workshop
+        shell: bash
+        run: |
+          "$RUNNER_TEMP/steamcmd/steamcmd.sh" +login "$STEAM_USERNAME" +workshop_build_item "$RUNNER_TEMP/workshop.vdf" +quit
