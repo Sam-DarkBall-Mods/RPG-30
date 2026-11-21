@@ -1,0 +1,5 @@
+ignore_pboprefix = true
+
+# the model and materials come binarized from the Workshop release
+[binarize]
+enabled = false

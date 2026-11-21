@@ -1,12 +1,16 @@
-name = "DB Example Mod"
-prefix = "db_example"
+name = "RPG-30 Hook"
+prefix = "rpg"
 mainprefix = "z"
-author = "DarkBall, Sam, and contributors"
+author = "Sam, DarkBall, and contributors"
 
 [files]
 include = [
     "meta.cpp",
     "mod.cpp",
+    "data/1024.paa",
+    "data/256.paa",
+    "data/128.paa",
+    "keys/rpg_30.bikey",
 ]
 
 exclude = [
@@ -39,7 +43,7 @@ git_hash = 0
 pdrive = "disallow"
 
 [hemtt.release]
-folder = "DB_Example_Mod"
+folder = "RPG_30"
 
 [signing]
-authority = "db_example"
+authority = "rpg_30"

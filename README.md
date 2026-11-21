@@ -1,32 +1,28 @@
-# Arma 3 mod template
+# RPG-30 Hook
 
-[![CI](https://github.com/Sam-DarkBall-Mods/mod-template/actions/workflows/ci.yml/badge.svg)](https://github.com/Sam-DarkBall-Mods/mod-template/actions/workflows/ci.yml)
+[![CI](https://github.com/Sam-DarkBall-Mods/RPG-30/actions/workflows/ci.yml/badge.svg)](https://github.com/Sam-DarkBall-Mods/RPG-30/actions/workflows/ci.yml)
 
-This is the starting point for new Sam-DarkBall-Mods projects. It contains the
-HEMTT config, CI workflows, release checks, licenses and the basic repository
-tests used by the existing mods.
+The RPG-30 Kryuk disposable anti-tank launcher for Arma 3, from the
+[Steam Workshop item](https://steamcommunity.com/sharedfiles/filedetails/?id=3042754975).
 
-Create a repository from this template, replace the example addon and update
-the project name, prefix and release folder in `.hemtt/project.toml`.
+## Requirements
 
-## What you need
+- Arma 3
+- [CBA_A3](https://steamcommunity.com/sharedfiles/filedetails/?id=450814997)
 
-- Arma 3 2.22 or newer
-- [HEMTT](https://hemtt.dev/) 1.21 or newer
-
-## Local checks
+## Build
 
 ```bash
 python3 -B tools/validate_repository.py
 python3 -B -m unittest discover -s tests -p "test_*.py" -v
 hemtt check
-hemtt build --no-bin
+hemtt build
 ```
 
-The local build skips BI binarization. The Windows release job uses Arma 3
-Tools and produces the files intended for distribution.
+The addon is packed without binarization: the model and materials are already
+binarized in the Workshop release. The PBO keeps the `rpg_30` prefix and the
+`rpg_30` signing key, so existing servers keep working.
 
 ## License
 
-SQF, Arma configs and repository tooling use GPL-2.0-or-later. Original game
-assets use APL-SA. See [LICENSES.md](LICENSES.md) for the split.
+See [LICENSES.md](LICENSES.md) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
