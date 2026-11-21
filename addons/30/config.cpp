@@ -176,7 +176,7 @@ class CfgWeapons {
         descriptionShort = "RPG30 used tube";
         weaponPoolAvailable = 0;
         class WeaponSlotsInfo: WeaponSlotsInfo {
-            mass = 100;
+            mass = 147;
         };
     };
 };
