@@ -3,9 +3,9 @@ class CfgPatches {
         units[] = {"RPG30_box"};
         weapons[] = {"launch_RPG_ready_F", "RPG_30K_used", "RPG_30K"};
         requiredVersion = 0.1;
-        requiredAddons[] = {"A3_Weapons_F_Exp_Launchers_RPG32", "A3_Weapons_F"};
+        requiredAddons[] = {"A3_Weapons_F_Exp_Launchers_RPG32", "A3_Weapons_F", "cba_disposable"};
         magazines[] = {"RPG_30K_MAG"};
-        ammo[] = {"PG7VR", "ammo_Penetrator_PRG30"};
+        ammo[] = {"PG7VR", "RPG_30K_IG30", "ammo_Penetrator_PRG30"};
     };
 };
 class CBA_DisposableLaunchers {
@@ -25,27 +25,43 @@ class CfgMagazines {
         mass = 80;
     };
 };
+class CfgFunctions {
+    class RPG30 {
+        class main {
+            file = "\rpg_30\functions";
+            class fired {};
+        };
+    };
+};
 class CfgAmmo {
-    class ShellCore;
-    class ShellBase;
     class ammo_Penetrator_Base;
     class R_PG32V_F;
     class PG7VR: R_PG32V_F {
-        submunitionAmmo = "ammo_Penetrator_Jian";
+        submunitionAmmo = "ammo_Penetrator_PRG30";
     };
+    // 650 mm RHA
     class ammo_Penetrator_PRG30: ammo_Penetrator_Base {
-        caliber = 1;
+        caliber = 43.3333;
         warheadName = "TandemHEAT";
         hit = 600;
-        indirectHit = 600;
-        indirectHitRange = 2;
-        submunitionAmmo = "ammo_Penetrator_Jian";
-        submunitionDirectionType = "SubmunitionModelDirection";
-        submunitionInitSpeed = 1000;
-        submunitionParentSpeedCoef = 0;
-        submunitionInitialOffset[] = {0, 0, -0.2};
-        triggerOnImpact = 1;
-        deleteParentWhenTriggered = 0;
+    };
+    class RPG_30K_IG30: R_PG32V_F {
+        model = "\A3\Weapons_F\Ammo\Rocket_01_fly_F";
+        hit = 5;
+        indirectHit = 0;
+        indirectHitRange = 0;
+        explosive = 0;
+        warheadName = "";
+        submunitionAmmo = "";
+        submunitionInitSpeed = 0;
+        submunitionInitialOffset[] = {0, 0, 0};
+        triggerOnImpact = 0;
+        explosionEffects = "";
+        CraterEffects = "";
+        soundHit[] = {"", 1, 1};
+        multiSoundHit[] = {};
+        aiAmmoUsageFlags = 0;
+        cost = 0;
     };
 };
 class Mode_SemiAuto;
@@ -72,9 +88,9 @@ class CfgWeapons {
                 useModelOptics = 0;
                 opticsFlare = 0;
                 opticsDisablePeripherialVision = 0;
-                opticsZoomMin = 0.05;
-                opticsZoomMax = 0.3;
-                opticsZoomInit = 0.05;
+                opticsZoomMin = 0.25;
+                opticsZoomMax = 0.6;
+                opticsZoomInit = 0.6;
                 visionMode = "";
                 discreteDistanceInitIndex = 0;
                 discreteDistance[] = {100, 200};
@@ -134,7 +150,7 @@ class CfgWeapons {
         magazineReloadTime = 0.1;
         reloadMagazineSound[] = {"", 1, 1};
         class WeaponSlotsInfo: WeaponSlotsInfo {
-            mass = 180;
+            mass = 227;
         };
     };
     class launch_RPG_ready_F: RPG_30K {
@@ -145,10 +161,10 @@ class CfgWeapons {
         magazines[] = {"RPG_30K_MAG"};
         magazineWell[] = {"RPG32"};
         class EventHandlers {
-            fired = "_this call CBA_fnc_firedDisposable";
+            fired = "_this call CBA_fnc_firedDisposable; _this call RPG30_fnc_fired";
         };
         class WeaponSlotsInfo: WeaponSlotsInfo {
-            mass = 100;
+            mass = 147;
         };
     };
     class RPG_30K_used: RPG_30K {
